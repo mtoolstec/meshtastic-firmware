@@ -348,12 +348,6 @@ void menuHandler::homeBaseMenu()
 
 void menuHandler::systemBaseMenu()
 {
-    // Check if brightness is supported
-    bool hasSupportBrightness = false;
-#if defined(ST7789_CS) || defined(USE_OLED) || defined(USE_SSD1306) || defined(USE_SH1106) || defined(USE_SH1107) || HAS_TFT
-    hasSupportBrightness = true;
-#endif
-
     enum optionsNumbers { Back, Notifications, ScreenOptions, PowerMenu, Test, enumEnd };
     static const char *optionsArray[enumEnd] = {"Back"};
     static int optionsEnumArray[enumEnd] = {Back};
@@ -474,18 +468,21 @@ void menuHandler::positionBaseMenu()
 
 void menuHandler::nodeListMenu()
 {
-    enum optionsNumbers { Back, Favorite, Verify, Reset };
+    enum optionsNumbers { Back, Favorite, Verify, Trace, Reset };
     static const char *optionsArray[] = {"Back", "Add Favorite", "Key Verification", "Trace Route", "Reset NodeDB"};
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Node Action";
     bannerOptions.optionsArrayPtr = optionsArray;
-    bannerOptions.optionsCount = 4;
+    bannerOptions.optionsCount = 5;
     bannerOptions.bannerCallback = [](int selected) -> void {
         if (selected == Favorite) {
             menuQueue = add_favorite;
             screen->runNow();
         } else if (selected == Verify) {
             menuQueue = key_verification_init;
+            screen->runNow();
+        } else if (selected == Trace) {
+            menuQueue = trace_route_picker;
             screen->runNow();
         } else if (selected == Reset) {
             menuQueue = reset_node_db_menu;
@@ -497,13 +494,15 @@ void menuHandler::nodeListMenu()
 
 void menuHandler::resetNodeDBMenu()
 {
+    enum optionsNumbers { Back = 0, Confirm = 1 };
+    
     static const char *optionsArray[] = {"Back", "Confirm"};
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Confirm Reset NodeDB";
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 2;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1) {
+        if (selected == Confirm) {
             disableBluetooth();
             LOG_INFO("Initiate node-db reset");
             nodeDB->resetNodes();
@@ -552,6 +551,7 @@ void menuHandler::compassNorthMenu()
 #if !MESHTASTIC_EXCLUDE_GPS
 void menuHandler::GPSToggleMenu()
 {
+    enum optionsNumbers { Back = 0, Enabled = 1, Disabled = 2 };
 
     static const char *optionsArray[] = {"Back", "Enabled", "Disabled"};
     BannerOverlayOptions bannerOptions;
@@ -559,12 +559,12 @@ void menuHandler::GPSToggleMenu()
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 3;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1) {
+        if (selected == Enabled) {
             config.position.gps_mode = meshtastic_Config_PositionConfig_GpsMode_ENABLED;
             playGPSEnableBeep();
             gps->enable();
             service->reloadConfig(SEGMENT_CONFIG);
-        } else if (selected == 2) {
+        } else if (selected == Disabled) {
             config.position.gps_mode = meshtastic_Config_PositionConfig_GpsMode_DISABLED;
             playGPSDisableBeep();
             gps->disable();
@@ -574,30 +574,34 @@ void menuHandler::GPSToggleMenu()
             screen->runNow();
         }
     };
-    bannerOptions.InitialSelected = config.position.gps_mode == meshtastic_Config_PositionConfig_GpsMode_ENABLED ? 1 : 2;
+    bannerOptions.InitialSelected = config.position.gps_mode == meshtastic_Config_PositionConfig_GpsMode_ENABLED ? Enabled : Disabled;
     screen->showOverlayBanner(bannerOptions);
 }
 #endif
 
 void menuHandler::BluetoothToggleMenu()
 {
+    enum optionsNumbers { Back = 0, Enabled = 1, Disabled = 2 };
+    
     static const char *optionsArray[] = {"Back", "Enabled", "Disabled"};
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Toggle Bluetooth";
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 3;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1 || selected == 2) {
+        if (selected == Enabled || selected == Disabled) {
             InputEvent event = {.inputEvent = (input_broker_event)170, .kbchar = 170, .touchX = 0, .touchY = 0};
             inputBroker->injectInputEvent(&event);
         }
     };
-    bannerOptions.InitialSelected = config.bluetooth.enabled ? 1 : 2;
+    bannerOptions.InitialSelected = config.bluetooth.enabled ? Enabled : Disabled;
     screen->showOverlayBanner(bannerOptions);
 }
 
 void menuHandler::BuzzerModeMenu()
 {
+    enum optionsNumbers { AllEnabled = 0, BuzzerDisabled = 1, Notifications = 2, SystemOnly = 3 };
+    
     static const char *optionsArray[] = {"All Enabled", "Disabled", "Notifications", "System Only"};
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Buzzer Mode";
@@ -613,16 +617,18 @@ void menuHandler::BuzzerModeMenu()
 
 void menuHandler::BrightnessPickerMenu()
 {
+    enum optionsNumbers { Back = 0, Low = 1, Medium = 2, High = 3 };
+    
     static const char *optionsArray[] = {"Back", "Low", "Medium", "High"};
 
     // Get current brightness level to set initial selection
-    int currentSelection = 1; // Default to Medium
+    int currentSelection = Medium; // Default to Medium
     if (uiconfig.screen_brightness >= 255) {
-        currentSelection = 3; // Very High
+        currentSelection = High; // Very High
     } else if (uiconfig.screen_brightness >= 128) {
-        currentSelection = 2; // High
+        currentSelection = Medium; // High
     } else {
-        currentSelection = 1; // Medium
+        currentSelection = Low; // Medium
     }
 
     BannerOverlayOptions bannerOptions;
@@ -630,11 +636,11 @@ void menuHandler::BrightnessPickerMenu()
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 4;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1) { // Medium
+        if (selected == Low) { // Low
             uiconfig.screen_brightness = 64;
-        } else if (selected == 2) { // High
+        } else if (selected == Medium) { // Medium
             uiconfig.screen_brightness = 128;
-        } else if (selected == 3) { // Very High
+        } else if (selected == High) { // High
             uiconfig.screen_brightness = 255;
         }
 
@@ -661,13 +667,15 @@ void menuHandler::BrightnessPickerMenu()
 
 void menuHandler::switchToMUIMenu()
 {
+    enum optionsNumbers { No = 0, Yes = 1 };
+    
     static const char *optionsArray[] = {"No", "Yes"};
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Switch to MUI?";
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 2;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1) {
+        if (selected == Yes) {
             config.display.displaymode = meshtastic_Config_DisplayConfig_DisplayMode_COLOR;
             config.bluetooth.enabled = false;
             service->reloadConfig(SEGMENT_CONFIG);
@@ -773,13 +781,15 @@ void menuHandler::TFTColorPickerMenu(OLEDDisplay *display)
 
 void menuHandler::rebootMenu()
 {
+    enum optionsNumbers { Back = 0, Confirm = 1 };
+    
     static const char *optionsArray[] = {"Back", "Confirm"};
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Reboot Device?";
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 2;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1) {
+        if (selected == Confirm) {
             IF_SCREEN(screen->showSimpleBanner("Rebooting...", 0));
             nodeDB->saveToDisk();
             rebootAtMsec = millis() + DEFAULT_REBOOT_SECONDS * 1000;
@@ -793,13 +803,15 @@ void menuHandler::rebootMenu()
 
 void menuHandler::shutdownMenu()
 {
+    enum optionsNumbers { Back = 0, Confirm = 1 };
+    
     static const char *optionsArray[] = {"Back", "Confirm"};
     BannerOverlayOptions bannerOptions;
     bannerOptions.message = "Shutdown Device?";
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 2;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1) {
+        if (selected == Confirm) {
             IF_SCREEN(screen->showSimpleBanner("Shutting Down...", 0));
             nodeDB->saveToDisk();
             power->shutdown();
@@ -822,6 +834,7 @@ void menuHandler::addFavoriteMenu()
 
 void menuHandler::removeFavoriteMenu()
 {
+    enum optionsNumbers { Back = 0, Yes = 1 };
 
     static const char *optionsArray[] = {"Back", "Yes"};
     BannerOverlayOptions bannerOptions;
@@ -834,7 +847,7 @@ void menuHandler::removeFavoriteMenu()
     bannerOptions.optionsArrayPtr = optionsArray;
     bannerOptions.optionsCount = 2;
     bannerOptions.bannerCallback = [](int selected) -> void {
-        if (selected == 1) {
+        if (selected == Yes) {
             nodeDB->set_favorite(false, graphics::UIRenderer::currentFavoriteNodeNum);
             screen->setFrames(graphics::Screen::FOCUS_PRESERVE);
         }
@@ -1034,6 +1047,8 @@ void menuHandler::keyVerificationInitMenu()
 
 void menuHandler::keyVerificationFinalPrompt()
 {
+    enum optionsNumbers { Reject = 0, Accept = 1 };
+    
     char message[40] = {0};
     memset(message, 0, sizeof(message));
     sprintf(message, "Verification: \n");
@@ -1048,7 +1063,7 @@ void menuHandler::keyVerificationFinalPrompt()
         options.optionsCount = 2;
         options.notificationType = graphics::notificationTypeEnum::selection_picker;
         options.bannerCallback = [=](int selected) {
-            if (selected == 1) {
+            if (selected == Accept) {
                 auto remoteNodePtr = nodeDB->getMeshNode(keyVerificationModule->getCurrentRemoteNode());
                 remoteNodePtr->bitfield |= NODEINFO_BITFIELD_IS_KEY_MANUALLY_VERIFIED_MASK;
             }
