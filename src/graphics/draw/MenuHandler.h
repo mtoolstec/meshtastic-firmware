@@ -1,3 +1,5 @@
+#pragma once
+#if HAS_SCREEN
 #include "configuration.h"
 namespace graphics
 {
@@ -21,13 +23,21 @@ class menuHandler
         tftcolormenupicker,
         brightness_picker,
         reboot_menu,
+        shutdown_menu,
         add_favorite,
         remove_favorite,
         trace_route_picker,
         test_menu,
         number_test,
         wifi_toggle_menu,
-        bluetooth_toggle_menu
+        bluetooth_toggle_menu,
+        notifications_menu,
+        screen_options_menu,
+        power_menu,
+        system_base_menu,
+        key_verification_init,
+        key_verification_final_prompt,
+        throttle_message
     };
     static screenMenus menuQueue;
 
@@ -51,6 +61,7 @@ class menuHandler
     static void resetNodeDBMenu();
     static void BrightnessPickerMenu();
     static void rebootMenu();
+    static void shutdownMenu();
     static void addFavoriteMenu();
     static void removeFavoriteMenu();
     static void traceRoutePickerMenu();
@@ -58,7 +69,16 @@ class menuHandler
     static void numberTest();
     static void wifiBaseMenu();
     static void wifiToggleMenu();
+    static void notificationsMenu();
+    static void screenOptionsMenu();
+    static void powerMenu();
+
+  private:
+    static void saveUIConfig();
+    static void keyVerificationInitMenu();
+    static void keyVerificationFinalPrompt();
     static void BluetoothToggleMenu();
 };
 
 } // namespace graphics
+#endif
